@@ -1,6 +1,5 @@
 import socket
-
-PKT_SIZE = 1024
+from constants import PKT_SIZE
 
 def run_server():
     host = socket.gethostname()

@@ -1,4 +1,5 @@
 import socket
+from constants import PKT_SIZE
 
 def run_client():
     host = socket.gethostname()
