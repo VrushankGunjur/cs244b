@@ -14,7 +14,9 @@ class NodeServer:
         self.from_master = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.from_master.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # ??
         self.from_master.bind((self.host, self.port))
-        self.from_master.listen(1)                      # only talk to the master server
+        self.from_master.listen(1)  # only talk to the master server
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind(('localhost', 5003))
         self.cache_lock = threading.Lock()
         self.id = None
         
@@ -23,10 +25,14 @@ class NodeServer:
     def heartbeat(self):
         # send heartbeats to master server
         while True:
-            self.server_socket.send("heartbeat".encode())
+            msg = "heartbeat"
+            if self.id:
+                msg += str(self.id)
+            self.server_socket.send(msg.encode())
             print("Heartbeat sent")
+            response = self.server_socket.recv(PKT_SIZE)
             if not self.id:
-                self.server_socket.re
+                self.id = str(response)
             time.sleep(5)
         
     def respond(self):

@@ -2,7 +2,7 @@ import socket
 import requests
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
-from constants import PKT_SIZE, NUM_CACHE_SERVERS, MASTER_PORT, CACHE1_PORT
+from constants import PKT_SIZE, NUM_CACHE_SERVERS, MASTER_PORT, CACHE1_PORT, HEARTBEAT_MSG_LEN, MAX_HEARTBEAT_TIME
 import time
 from collections import defaultdict
 
@@ -16,19 +16,30 @@ cache_servers = defaultdict(int)
 cache_id = 0
 heartbeat_lock = threading.Lock()
 
-def handle_heartbeats():
+def receive_heartbeats():
     # set up a socket on 5003, listen for heartbeats from cache servers
     # update the cache server list according to hearbeat data
-    # respond to join request with ID
-    heartbeat_lock.acquire()
-    while 1:
+    while True:
         s = socket.socket()
         s.connect(('localhost', 5003))
         s.listen(NUM_CACHE_SERVERS)
         connection, client = s.accept()
         response = connection.recv(PKT_SIZE)
-        if response == 'heartbeat':
-              cache_servers[] - last_heartbeat = time.time() 
+        if "heartbeat" in response:
+            # assign an id if server doesn't yet have one
+            if len(response) == HEARTBEAT_MSG_LEN:
+                cache_id += 1
+                connection.sendall(str(cache_id).encode())
+            else:
+                curr_id = int(response[HEARTBEAT_MSG_LEN + 1:])
+                cache_servers[curr_id] = time.time()
+                connection.sendall("".encode())
+
+# Flush caches that haven't sent heartbeats recently
+def flush():
+    for cache_id in cache_servers.keys():
+        if time.time() - cache_servers[cache_id] > MAX_HEARTBEAT_TIME:
+            del cache_id
 
 class RequestHandler(BaseHTTPRequestHandler):
 
