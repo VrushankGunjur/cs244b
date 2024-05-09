@@ -1,7 +1,7 @@
 import socket
 import requests
 import threading
-from constants import PKT_SIZE, MAX_CACHE_SIZE
+from constants import PKT_SIZE, MAX_CACHE_SIZE, TO_MASTER_FROM_NODES
 from collections import OrderedDict
 import time
 
@@ -15,8 +15,9 @@ class NodeServer:
         self.from_master.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # ??
         self.from_master.bind((self.host, self.port))
         self.from_master.listen(1)  # only talk to the master server
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind(('localhost', 5003))
+
+        self.server_socket = socket.socket()
+        self.server_socket.connect(('localhost', TO_MASTER_FROM_NODES))
         self.cache_lock = threading.Lock()
         self.id = None
         
@@ -29,10 +30,11 @@ class NodeServer:
             if self.id:
                 msg += str(self.id)
             self.server_socket.send(msg.encode())
-            print("Heartbeat sent")
+            print("heartbeat sent")
             response = self.server_socket.recv(PKT_SIZE)
             if not self.id:
                 self.id = str(response)
+                print('node ID added')
             time.sleep(5)
         
     def respond(self):
@@ -54,13 +56,16 @@ class NodeServer:
                 # MAKE REQUEST TO INTERNET
                 self.cache_lock.release()
                 response = requests.get(url)
+                print(f"LMAO received response {response}")
+                response_body = response.content
+                status_code_bytes = bytes(response.status_code, 'utf-8')
                 if response.status_code == 200:
                     self.cache_lock.acquire()
-                    self.cache[url] = response
+                    self.cache[url] = response_body
                     if len(self.cache) > MAX_CACHE_SIZE:
                         self.cache.popitem(last=False)  # Pop LRU item
                     self.cache_lock.release()
-                response_to_master = response
+                response_to_master = status_code_bytes + response_body
 
             socket_to_master.send(response_to_master)
             socket_to_master.close()
@@ -70,14 +75,14 @@ class NodeServer:
     
     def run_server(self):
         # need to send heartbeats, and listen for commands from master server
-        # heartbeat_thread = threading.Thread(target=self.heartbeat)
         response_thread = threading.Thread(target=self.respond)
+        heartbeat_thread = threading.Thread(target=self.heartbeat)
 
-        # heartbeat_thread.start()
+        heartbeat_thread.start()
         response_thread.start()
 
         # join the threads once they return (blocking)
-        # heartbeat_thread.join()
+        heartbeat_thread.join()
         response_thread.join()
 
 if __name__ == "__main__":
