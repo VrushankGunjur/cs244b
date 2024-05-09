@@ -81,9 +81,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         # receive response from cache server
         response = s.recv(PKT_SIZE)
-        print(f"LMAO response received bytes {response}")
         response_string = response.decode('utf-8')
-        print(f"LMAO string received string {response_string}")
         try:
             status_code = int(response_string[:3])
             response_body = bytes(response_string[3:], 'utf-8')
@@ -91,8 +89,6 @@ class RequestHandler(BaseHTTPRequestHandler):
             status_code = -1
             response_body = b''      
             print(f"LMAO ERROR {e}")  
-        
-        print(f'LMAO {status_code}: {response_body}')
         
         # forward cache server response to client
         self.send_response(status_code)

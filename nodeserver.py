@@ -56,9 +56,8 @@ class NodeServer:
                 # MAKE REQUEST TO INTERNET
                 self.cache_lock.release()
                 response = requests.get(url)
-                print(f"LMAO received response {response}")
                 response_body = response.content
-                status_code_bytes = bytes(response.status_code, 'utf-8')
+                status_code_bytes = bytes(str(response.status_code), 'utf-8')
                 if response.status_code == 200:
                     self.cache_lock.acquire()
                     self.cache[url] = response_body
