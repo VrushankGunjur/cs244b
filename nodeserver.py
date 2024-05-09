@@ -17,7 +17,7 @@ class NodeServer:
         self.from_master.listen(1)  # only talk to the master server
 
         self.server_socket = socket.socket()
-        self.server_socket.connect(('localhost', TO_MASTER_FROM_NODES))
+        # self.server_socket.connect(('localhost', TO_MASTER_FROM_NODES))
         self.cache_lock = threading.Lock()
         self.id = None
         
@@ -50,7 +50,7 @@ class NodeServer:
             self.cache_lock.acquire()
             if url in self.cache:
                 self.cache.move_to_end(url, last=True)
-                response_to_master = self.cache[url]
+                response_to_master = bytes("200", 'utf-8') + self.cache[url]
                 self.cache_lock.release()
             else:
                 # MAKE REQUEST TO INTERNET
@@ -75,13 +75,13 @@ class NodeServer:
     def run_server(self):
         # need to send heartbeats, and listen for commands from master server
         response_thread = threading.Thread(target=self.respond)
-        heartbeat_thread = threading.Thread(target=self.heartbeat)
+        # heartbeat_thread = threading.Thread(target=self.heartbeat)
 
-        heartbeat_thread.start()
+        # heartbeat_thread.start()
         response_thread.start()
 
         # join the threads once they return (blocking)
-        heartbeat_thread.join()
+        # heartbeat_thread.join()
         response_thread.join()
 
 if __name__ == "__main__":
