@@ -17,22 +17,24 @@ cache_id = 0
 server_map_lock = threading.Lock()
 
 def receive_heartbeats():
+    global cache_id
     # set up a socket on 5003, listen for heartbeats from cache servers
     # update the cache server list according to hearbeat data
 
     # host = socket.gethostname()
-    port = TO_MASTER_FROM_NODES
 
-    to_master = socket.socket()
-    to_master.bind(('localhost', port))
-
-    to_master.listen(NUM_CACHE_SERVERS) # how many clients the server can listen to at the same time
+    from_node = socket.socket()
+    from_node.bind(('localhost', TO_MASTER_FROM_NODES))
+    print(f"Master listening to node servers on port {TO_MASTER_FROM_NODES}...")
+    from_node.listen(NUM_CACHE_SERVERS) # how many clients the server can listen to at the same time
 
     while True:
-        connection, addr = to_master.accept()
+        connection, addr = from_node.accept()
         print("Connection from: " + str(addr))
         response = connection.recv(PKT_SIZE)
         #connection.send("Hello from server".encode())
+        response = response.decode()
+        print(response)
         if "heartbeat" in response:
             # assign an id if server doesn't yet have one
             print("received heartbeat from node server")
@@ -41,7 +43,7 @@ def receive_heartbeats():
                 connection.sendall(str(cache_id).encode())
                 print("assigning node id...")
             else:
-                curr_id = int(response[HEARTBEAT_MSG_LEN + 1:])
+                curr_id = int(response[HEARTBEAT_MSG_LEN:])
                 cache_servers[curr_id] = time.time()
                 connection.sendall("".encode())
         flush()

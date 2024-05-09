@@ -15,9 +15,6 @@ class NodeServer:
         self.from_master.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # ??
         self.from_master.bind((self.host, self.port))
         self.from_master.listen(1)  # only talk to the master server
-
-        self.server_socket = socket.socket()
-        # self.server_socket.connect(('localhost', TO_MASTER_FROM_NODES))
         self.cache_lock = threading.Lock()
         self.id = None
         
@@ -26,16 +23,18 @@ class NodeServer:
     def heartbeat(self):
         # send heartbeats to master server
         while True:
+            to_master = socket.socket()
+            to_master.connect(('localhost', TO_MASTER_FROM_NODES))
             msg = "heartbeat"
             if self.id:
                 msg += str(self.id)
-            self.server_socket.send(msg.encode())
+            to_master.send(msg.encode())
             print("heartbeat sent")
-            response = self.server_socket.recv(PKT_SIZE)
+            response = to_master.recv(PKT_SIZE)
             if not self.id:
-                self.id = str(response)
+                self.id = str(response.decode())
                 print('node ID added')
-            time.sleep(5)
+            time.sleep(1)
         
     def respond(self):
         # listen for commands from master server
@@ -69,19 +68,19 @@ class NodeServer:
             socket_to_master.send(response_to_master)
             socket_to_master.close()
 
-            # data = self.server_socket.recv(PKT_SIZE)
+            # data = self.to_master.recv(PKT_SIZE)
             # print("Received data: ", data.decode())
     
     def run_server(self):
         # need to send heartbeats, and listen for commands from master server
         response_thread = threading.Thread(target=self.respond)
-        # heartbeat_thread = threading.Thread(target=self.heartbeat)
+        heartbeat_thread = threading.Thread(target=self.heartbeat)
 
-        # heartbeat_thread.start()
+        heartbeat_thread.start()
         response_thread.start()
 
         # join the threads once they return (blocking)
-        # heartbeat_thread.join()
+        heartbeat_thread.join()
         response_thread.join()
 
 if __name__ == "__main__":
