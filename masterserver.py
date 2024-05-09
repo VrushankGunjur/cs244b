@@ -20,16 +20,16 @@ def receive_heartbeats():
     # set up a socket on 5003, listen for heartbeats from cache servers
     # update the cache server list according to hearbeat data
 
-    host = socket.gethostname()
+    # host = socket.gethostname()
     port = TO_MASTER_FROM_NODES
 
-    server_socket = socket.socket()
-    server_socket.bind((host, port))
+    to_master = socket.socket()
+    to_master.bind(('localhost', port))
 
-    server_socket.listen(NUM_CACHE_SERVERS) # how many clients the server can listen to at the same time
+    to_master.listen(NUM_CACHE_SERVERS) # how many clients the server can listen to at the same time
 
     while True:
-        connection, addr = server_socket.accept()
+        connection, addr = to_master.accept()
         print("Connection from: " + str(addr))
         response = connection.recv(PKT_SIZE)
         #connection.send("Hello from server".encode())
