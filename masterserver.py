@@ -23,29 +23,27 @@ def receive_heartbeats():
 
     # host = socket.gethostname()
 
-    from_node = socket.socket()
+    from_node = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     from_node.bind(('localhost', TO_MASTER_FROM_NODES))
     print(f"Master listening to node servers on port {TO_MASTER_FROM_NODES}...")
     from_node.listen(NUM_CACHE_SERVERS) # how many clients the server can listen to at the same time
 
     while True:
         connection, addr = from_node.accept()
-        print("Connection from: " + str(addr))
         response = connection.recv(PKT_SIZE)
         #connection.send("Hello from server".encode())
         response = response.decode()
         print(response)
         if "heartbeat" in response:
             # assign an id if server doesn't yet have one
-            print("received heartbeat from node server")
             if len(response) == HEARTBEAT_MSG_LEN:
                 cache_id += 1
                 connection.sendall(str(cache_id).encode())
-                print("assigning node id...")
             else:
                 curr_id = int(response[HEARTBEAT_MSG_LEN:])
                 cache_servers[curr_id] = time.time()
                 connection.sendall("".encode())
+        connection.close()
         flush()
 
 # Flush caches that haven't sent heartbeats recently

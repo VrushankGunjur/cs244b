@@ -23,18 +23,17 @@ class NodeServer:
     def heartbeat(self):
         # send heartbeats to master server
         while True:
-            to_master = socket.socket()
+            to_master = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             to_master.connect(('localhost', TO_MASTER_FROM_NODES))
             msg = "heartbeat"
             if self.id:
                 msg += str(self.id)
             to_master.send(msg.encode())
-            print("heartbeat sent")
             response = to_master.recv(PKT_SIZE)
             if not self.id:
                 self.id = str(response.decode())
-                print('node ID added')
             time.sleep(1)
+            to_master.close()
         
     def respond(self):
         # listen for commands from master server
