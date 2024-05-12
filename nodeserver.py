@@ -1,7 +1,7 @@
 import socket
 import requests
 import threading
-from constants import PKT_SIZE, MAX_CACHE_SIZE, TO_MASTER_FROM_NODES
+import constants
 from collections import OrderedDict
 import time
 
@@ -24,13 +24,14 @@ class NodeServer:
         # send heartbeats to master server
         while True:
             to_master = socket.socket()
-            to_master.connect(('localhost', TO_MASTER_FROM_NODES))
+            to_master.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            to_master.connect(('localhost', constants.TO_MASTER_FROM_NODES))
             msg = "heartbeat"
             if self.id:
                 msg += str(self.id)
             to_master.send(msg.encode())
             print("heartbeat sent")
-            response = to_master.recv(PKT_SIZE)
+            response = to_master.recv(constants.PKT_SIZE)
             if not self.id:
                 self.id = str(response.decode())
                 print('node ID added')
@@ -40,7 +41,7 @@ class NodeServer:
         # listen for commands from master server
         while True:
             socket_to_master, addr = self.from_master.accept()
-            data = socket_to_master.recv(PKT_SIZE)
+            data = socket_to_master.recv(constants.PKT_SIZE)
             # process the command
             print("Received command: ", data.decode())
             
@@ -60,7 +61,7 @@ class NodeServer:
                 if response.status_code == 200:
                     self.cache_lock.acquire()
                     self.cache[url] = response_body
-                    if len(self.cache) > MAX_CACHE_SIZE:
+                    if len(self.cache) > constants.MAX_CACHE_SIZE:
                         self.cache.popitem(last=False)  # Pop LRU item
                     self.cache_lock.release()
                 response_to_master = status_code_bytes + response_body
@@ -84,5 +85,17 @@ class NodeServer:
         response_thread.join()
 
 if __name__ == "__main__":
-    node_server = NodeServer('localhost', 5002)
-    print("Node server started on port 5001")
+    node_servers = []
+    i = 0
+    num_spun = 0
+    while 1:
+        try:
+            node_servers.append(NodeServer('localhost', constants.CACHE1_PORT + i))
+            print(f"Node server started on port {constants.CACHE1_PORT + i}")
+            num_spun += 1
+            i += 1
+        except Exception as e:
+            print(f"Node server failed to start on port {constants.CACHE1_PORT + i}, trying next port..., exception {e}")
+            i += 1
+        if num_spun > constants.NUM_CACHE_SERVERS:
+            break

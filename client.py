@@ -1,6 +1,5 @@
-import socket
 import requests 
-from constants import PKT_SIZE
+import time
 # Client code makes a request for a webpage, rerouting through server (proxy)
 
 proxies = {
@@ -21,6 +20,19 @@ def run_client():
 
     # client_socket.send("Hello from client".encode())
     # print(client_socket.recv(1024))
+
+
+def multi_request():
+    start_time = time.time()
+    r1 = requests.get("http://www.google.com", proxies=proxies)
+    r1_time = time.time()
+    r2 = requests.get("https://www.stanford.edu/", proxies=proxies) # HTTPS request
+    r2_time = time.time()
+    r3 = requests.get("https://www.scs.stanford.edu/20sp-cs244b/", proxies=proxies)
+    r3_time = time.time()
+
+    # LRU: stanford.edu should be in cache, google should not be request stanford again, then request yahoo. SCS should be booted from cache, not stanford
+
 
 if __name__ == "__main__":
     run_client()

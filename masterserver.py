@@ -2,9 +2,10 @@ import socket
 import requests
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
-from constants import PKT_SIZE, NUM_CACHE_SERVERS, MASTER_PORT, CACHE1_PORT, HEARTBEAT_MSG_LEN, MAX_HEARTBEAT_TIME, TO_MASTER_FROM_NODES
+import constants
 import time
 from collections import defaultdict
+from hashring import HashRing
 
 """
 Central Server listens for connections/client requests, checks if their request is in cache. 
@@ -12,48 +13,76 @@ If not, server makes a request to the web server, caches the response, and sends
 Central Server also listens to communications from the cache shards to monitor status.
 """
 
-cache_servers = defaultdict(int) # this dict is going to have to log the port number of the cache server?
-cache_id = 0
-server_map_lock = threading.Lock()
+node_servers = defaultdict(int)     # key: node_id, value: last time heartbeat was received
+node_id_to_port = defaultdict(int)  # key: node_id, value: port number
+next_node_server_id = 0             # id to assign to next cache server that sends a heartbeat
+server_map_lock = threading.Lock()  # lock for node_servers and node_id_to_port
+hash_ring = HashRing()              # hash ring to determine which cache server to send request to
+hash_ring_lock = threading.Lock()   # lock for hash_ring
 
 def receive_heartbeats():
-    global cache_id
+    global next_node_server_id
     # set up a socket on 5003, listen for heartbeats from cache servers
     # update the cache server list according to hearbeat data
 
     # host = socket.gethostname()
 
     from_node = socket.socket()
-    from_node.bind(('localhost', TO_MASTER_FROM_NODES))
-    print(f"Master listening to node servers on port {TO_MASTER_FROM_NODES}...")
-    from_node.listen(NUM_CACHE_SERVERS) # how many clients the server can listen to at the same time
+    from_node.bind(('localhost', constants.TO_MASTER_FROM_NODES))
+    print(f"Master listening to node servers on port {constants.TO_MASTER_FROM_NODES}...")
+    from_node.listen(constants.NUM_CACHE_SERVERS) # how many clients the server can listen to at the same time
 
     while True:
         connection, addr = from_node.accept()
         print("Connection from: " + str(addr))
-        response = connection.recv(PKT_SIZE)
+        response = connection.recv(constants.PKT_SIZE)
         #connection.send("Hello from server".encode())
         response = response.decode()
         print(response)
         if "heartbeat" in response:
             # assign an id if server doesn't yet have one
             print("received heartbeat from node server")
-            if len(response) == HEARTBEAT_MSG_LEN:
-                cache_id += 1
-                connection.sendall(str(cache_id).encode())
+            if len(response) == constants.HEARTBEAT_MSG_LEN:
+                incoming_port = addr[1]
+                print(f"Locking server_map_lockk")
+                server_map_lock.acquire()
+                node_id_to_port[next_node_server_id] = incoming_port
+                node_servers[next_node_server_id] = time.time()
+                server_map_lock.release()
+                print(f"Released server_map_lock")
+                print(f"Locking hash_ring_lock")
+                hash_ring_lock.acquire()
+                hash_ring.add_node(next_node_server_id)
+                hash_ring_lock.release()
+                print(f"Released hash_ring_lock")
+                connection.sendall(str(next_node_server_id).encode())
                 print("assigning node id...")
             else:
-                curr_id = int(response[HEARTBEAT_MSG_LEN:])
-                cache_servers[curr_id] = time.time()
+                #
+                curr_id = int(response[constants.HEARTBEAT_MSG_LEN:])
+                print(f"Locking server_map_lockk")
+                server_map_lock.acquire()
+                node_servers[curr_id] = time.time()
+                server_map_lock.release()
+                print(f"Released server_map_lock")
                 connection.sendall("".encode())
         flush()
 
 # Flush caches that haven't sent heartbeats recently
 def flush():
-    for cache_id in cache_servers.keys():
-        if time.time() - cache_servers[cache_id] > MAX_HEARTBEAT_TIME:
+    for next_node_server_id in list(node_servers.keys()):
+        if time.time() - node_servers[next_node_server_id] > constants.MAX_HEARTBEAT_TIME:
             print("node removed")
-            del cache_id
+            print(f"Locking server_map_lockk")
+            server_map_lock.acquire()
+            del node_servers[next_node_server_id]
+            del node_id_to_port[next_node_server_id]
+            server_map_lock.release()
+            print(f"Released server_map_lock")
+
+            hash_ring_lock.acquire()
+            hash_ring.remove_node(next_node_server_id)
+            hash_ring_lock.release()
 
 """
  TODO: hash the URL to determine which cache server to send request to, out of the running
@@ -77,12 +106,25 @@ class RequestHandler(BaseHTTPRequestHandler):
         # print(r.content)
 
         # forward request to cache server
+        requested_url = self.path
+        print(f"Locking hash_ring_lock")
+        hash_ring_lock.acquire()
+        node_id = hash_ring[requested_url]
+        hash_ring_lock.release()
+        print(f"Release hash_ring_lock")
+
+        print(f"Locking server_map_lockk")
+        server_map_lock.acquire()
+        node_port = node_id_to_port[node_id]
+        server_map_lock.release()
+        print(f"Release server_map_lockk")
+
         s = socket.socket()
-        s.connect(('localhost', CACHE1_PORT))
+        s.connect(('localhost', node_port))
         s.send(self.path.encode())
 
         # receive response from cache server
-        response = s.recv(PKT_SIZE)
+        response = s.recv(constants.PKT_SIZE)
         response_string = response.decode('utf-8')
         try:
             status_code = int(response_string[:3])
@@ -105,7 +147,7 @@ def run_server():
     heartbeat_thread.start()
     
     # then, start HTTP server
-    server_address = ('localhost', MASTER_PORT)
+    server_address = ('localhost', constants.MASTER_PORT)
     httpd = HTTPServer(server_address, RequestHandler)
     print('Starting server on port 5001')
     httpd.serve_forever()
