@@ -1,5 +1,7 @@
 import requests 
 import time
+import sys
+
 # Client code makes a request for a webpage, rerouting through server (proxy)
 
 proxies = {
@@ -8,7 +10,10 @@ proxies = {
 }
 
 def run_client():
-    r = requests.get("http://www.google.com", proxies=proxies)
+    url = "http://www.google.com"
+    if len(sys.argv) > 1:
+        url = sys.argv[1]
+    r = requests.get(url, proxies=proxies)
     print(r.text)
 
 

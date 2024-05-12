@@ -33,39 +33,40 @@ def receive_heartbeats():
     from_node.listen(constants.NUM_CACHE_SERVERS) # how many clients the server can listen to at the same time
 
     while True:
-        connection, addr = from_node.accept()
-        print("Connection from: " + str(addr))
+        connection, ephemeral_addr = from_node.accept()
+        print("Connection from: " + str(ephemeral_addr))
         response = connection.recv(constants.PKT_SIZE)
         #connection.send("Hello from server".encode())
-        response = response.decode()
-        print(response)
-        if "heartbeat" in response:
-            # assign an id if server doesn't yet have one
-            print("received heartbeat from node server")
-            if len(response) == constants.HEARTBEAT_MSG_LEN:
-                incoming_port = addr[1]
-                print(f"Locking server_map_lockk")
-                server_map_lock.acquire()
-                node_id_to_port[next_node_server_id] = incoming_port
-                node_servers[next_node_server_id] = time.time()
-                server_map_lock.release()
-                print(f"Released server_map_lock")
-                print(f"Locking hash_ring_lock")
-                hash_ring_lock.acquire()
-                hash_ring.add_node(next_node_server_id)
-                hash_ring_lock.release()
-                print(f"Released hash_ring_lock")
-                connection.sendall(str(next_node_server_id).encode())
-                print("assigning node id...")
-            else:
-                #
-                curr_id = int(response[constants.HEARTBEAT_MSG_LEN:])
-                print(f"Locking server_map_lockk")
-                server_map_lock.acquire()
-                node_servers[curr_id] = time.time()
-                server_map_lock.release()
-                print(f"Released server_map_lock")
-                connection.sendall("".encode())
+        response = response.decode().split(",")         # response is formatted as nodePort,nodeId
+        nodePort = int(response[0])
+        nodeId = response[1]
+
+
+        # assign an id if server doesn't yet have one
+        print("received heartbeat from node server")
+        if nodeId == '':
+            incoming_port = nodePort
+            print(f"Locking server_map_lockk")
+            server_map_lock.acquire()
+            node_id_to_port[next_node_server_id] = incoming_port
+            node_servers[next_node_server_id] = time.time()
+            server_map_lock.release()
+            print(f"Released server_map_lock")
+            print(f"Locking hash_ring_lock")
+            hash_ring_lock.acquire()
+            hash_ring.add_node(next_node_server_id)
+            hash_ring_lock.release()
+            print(f"Released hash_ring_lock")
+            connection.sendall(str(next_node_server_id).encode())
+            next_node_server_id += 1
+            print("assigning node id...")
+        else:
+            print(f"Locking server_map_lockk")
+            server_map_lock.acquire()
+            node_servers[int(nodeId)] = time.time()
+            server_map_lock.release()
+            print(f"Released server_map_lock")
+            connection.sendall("".encode())
         connection.close()
         flush()
 

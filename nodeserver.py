@@ -26,7 +26,9 @@ class NodeServer:
             to_master = socket.socket()
             to_master.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             to_master.connect(('localhost', constants.TO_MASTER_FROM_NODES))
-            msg = "heartbeat"
+            msg = str(self.port) # the port # is the heartbeat message
+            msg += ','
+            # potentially set a delimiter after port # to seperate from nodeID
             if self.id:
                 msg += str(self.id)
             to_master.send(msg.encode())
@@ -43,7 +45,7 @@ class NodeServer:
             socket_to_master, addr = self.from_master.accept()
             data = socket_to_master.recv(constants.PKT_SIZE)
             # process the command
-            print("Received command: ", data.decode())
+            print(f"Received command on node server {self.id}: ", data.decode())
             
             # check if in cache, if not, send request to web server. Respond to master server with response
             url = data.decode()
@@ -52,6 +54,7 @@ class NodeServer:
                 self.cache.move_to_end(url, last=True)
                 response_to_master = bytes("200", 'utf-8') + self.cache[url]
                 self.cache_lock.release()
+                print(f"Hit cache")
             else:
                 # MAKE REQUEST TO INTERNET
                 self.cache_lock.release()
@@ -65,9 +68,9 @@ class NodeServer:
                         self.cache.popitem(last=False)  # Pop LRU item
                     self.cache_lock.release()
                 response_to_master = status_code_bytes + response_body
-
+                print(f"Went to internet")
             socket_to_master.send(response_to_master)
-            socket_to_master.close()
+            # socket_to_master.close()
 
             # data = self.to_master.recv(PKT_SIZE)
             # print("Received data: ", data.decode())
