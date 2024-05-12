@@ -66,6 +66,7 @@ def receive_heartbeats():
                 server_map_lock.release()
                 print(f"Released server_map_lock")
                 connection.sendall("".encode())
+        connection.close()
         flush()
 
 # Flush caches that haven't sent heartbeats recently

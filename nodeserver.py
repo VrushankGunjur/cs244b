@@ -34,8 +34,8 @@ class NodeServer:
             response = to_master.recv(constants.PKT_SIZE)
             if not self.id:
                 self.id = str(response.decode())
-                print('node ID added')
             time.sleep(1)
+            to_master.close()
         
     def respond(self):
         # listen for commands from master server
