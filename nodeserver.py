@@ -4,6 +4,7 @@ import threading
 import constants
 from collections import OrderedDict
 import time
+import sys
 
 class NodeServer:
     def __init__(self, host, port):
@@ -13,13 +14,28 @@ class NodeServer:
         self.port = port
         self.from_master = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.from_master.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # ??
-        self.from_master.bind((self.host, self.port))
+
+        retry = 0
+        while 1:
+            try:
+                self.from_master.bind((self.host, int(self.port) + retry))
+                break
+            except Exception as e:
+                print(e)
+                retry += 1
+                continue
+    
         self.from_master.listen(1)  # only talk to the master server
         self.cache_lock = threading.Lock()
         self.id = None
         
         self.run_server()
+        #self.cur_obj_thread = threading.Thread(target=self.run_server())
 
+    def __del__(self):
+        self.from_master.close()
+        self.cur_obj_thread.join()
+    
     def heartbeat(self):
         # send heartbeats to master server
         while True:
@@ -83,22 +99,39 @@ class NodeServer:
         heartbeat_thread.start()
         response_thread.start()
 
+        print(f"Node server successfully started on port {self.port}")
+
         # join the threads once they return (blocking)
         heartbeat_thread.join()
         response_thread.join()
 
 if __name__ == "__main__":
-    node_servers = []
-    i = 0
-    num_spun = 0
-    while 1:
-        try:
-            node_servers.append(NodeServer('localhost', constants.CACHE1_PORT + i))
-            print(f"Node server started on port {constants.CACHE1_PORT + i}")
-            num_spun += 1
-            i += 1
-        except Exception as e:
-            print(f"Node server failed to start on port {constants.CACHE1_PORT + i}, trying next port..., exception {e}")
-            i += 1
-        if num_spun > constants.NUM_CACHE_SERVERS:
-            break
+    NodeServer('localhost', sys.argv[1])
+    # spinup_thread = threading.Thread(target=start_instances)
+    # spinup_thread.start()
+    # spinup_thread.join()
+
+
+
+    # print("Starting node servers")
+    # node_servers = []
+    # i = 0
+    # num_spun = 0
+    # while 1:
+    #     try:
+    #         print('pretry')
+    #         node_servers.append(NodeServer('localhost', constants.CACHE1_PORT + i))
+    #         #node_servers.append(NodeServer('localhost', constants.CACHE1_PORT + i))
+    #         print(f"Node server started on port {constants.CACHE1_PORT + i}")
+    #         num_spun += 1
+    #         i += 1
+    #     except Exception as e:
+    #         print(f"Node server failed to start on port {constants.CACHE1_PORT + i}, trying next port..., exception {e}")
+    #         i += 1
+    #     if num_spun > constants.NUM_CACHE_SERVERS:
+    #         break
+    # print("All node servers started")
+    # print(node_servers)
+
+    # for thread in node_servers:
+    #     thread.join()

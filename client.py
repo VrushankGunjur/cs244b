@@ -10,7 +10,9 @@ proxies = {
 }
 
 def run_client():
-    url = "http://www.google.com"
+    #url = "http://www.stanford.edu"
+    #url = "http://www.google.com"
+    url = "http://www.yahoo.com"
     if len(sys.argv) > 1:
         url = sys.argv[1]
     r = requests.get(url, proxies=proxies)

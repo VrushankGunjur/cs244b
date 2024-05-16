@@ -61,29 +61,32 @@ def receive_heartbeats():
             next_node_server_id += 1
             print("assigning node id...")
         else:
-            print(f"Locking server_map_lockk")
+            print(f"Locking server_map_lock")
             server_map_lock.acquire()
             node_servers[int(nodeId)] = time.time()
             server_map_lock.release()
             print(f"Released server_map_lock")
             connection.sendall("".encode())
         connection.close()
+
+        # this flush only runs after the blocking call to 'accept', so it might not actually remove failed caches on time
+        # @viraj
         flush()
 
-# Flush caches that haven't sent heartbeats recently
+# Flush caches that haven't sent heartbeats recently (this cleanup isn't working right now, see above @viraj)
 def flush():
-    for next_node_server_id in list(node_servers.keys()):
-        if time.time() - node_servers[next_node_server_id] > constants.MAX_HEARTBEAT_TIME:
+    for node_id in list(node_servers.keys()):
+        if time.time() - node_servers[node_id] > constants.MAX_HEARTBEAT_TIME:
             print("node removed")
             print(f"Locking server_map_lockk")
             server_map_lock.acquire()
-            del node_servers[next_node_server_id]
-            del node_id_to_port[next_node_server_id]
+            del node_servers[node_id]
+            del node_id_to_port[node_id]
             server_map_lock.release()
             print(f"Released server_map_lock")
 
             hash_ring_lock.acquire()
-            hash_ring.remove_node(next_node_server_id)
+            hash_ring.remove_node(node_id)
             hash_ring_lock.release()
 
 """
