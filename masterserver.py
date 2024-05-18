@@ -1,5 +1,4 @@
 import socket
-import requests
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
 import constants
@@ -46,7 +45,7 @@ def receive_heartbeats():
         print("received heartbeat from node server")
         if nodeId == '':
             incoming_port = nodePort
-            print(f"Locking server_map_lockk")
+            print(f"Locking server_map_lock")
             server_map_lock.acquire()
             node_id_to_port[next_node_server_id] = incoming_port
             node_servers[next_node_server_id] = time.time()
@@ -137,14 +136,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         except Exception as e:
             status_code = -1
             response_body = b''      
-            print(f"LMAO ERROR {e}")  
+            print(f"error {e} in response from cache server")  
         
         # forward cache server response to client
         self.send_response(status_code)
         self.send_header('Cstatus_codeent-type', 'text/html')
         self.end_headers()
         self.wfile.write(response_body)
-        #self.wfile.writee.content)
 
 def run_server():
     # start a thread to deal with all heartbeats in a loop (and this can handle managing cache servers)

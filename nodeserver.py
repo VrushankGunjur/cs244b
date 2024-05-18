@@ -34,7 +34,6 @@ class NodeServer:
 
     def __del__(self):
         self.from_master.close()
-        self.cur_obj_thread.join()
     
     def heartbeat(self):
         # send heartbeats to master server
@@ -58,7 +57,7 @@ class NodeServer:
     def respond(self):
         # listen for commands from master server
         while True:
-            socket_to_master, addr = self.from_master.accept()
+            socket_to_master, _ = self.from_master.accept()
             data = socket_to_master.recv(constants.PKT_SIZE)
             # process the command
             print(f"Received command on node server {self.id}: ", data.decode())
@@ -107,31 +106,3 @@ class NodeServer:
 
 if __name__ == "__main__":
     NodeServer('localhost', sys.argv[1])
-    # spinup_thread = threading.Thread(target=start_instances)
-    # spinup_thread.start()
-    # spinup_thread.join()
-
-
-
-    # print("Starting node servers")
-    # node_servers = []
-    # i = 0
-    # num_spun = 0
-    # while 1:
-    #     try:
-    #         print('pretry')
-    #         node_servers.append(NodeServer('localhost', constants.CACHE1_PORT + i))
-    #         #node_servers.append(NodeServer('localhost', constants.CACHE1_PORT + i))
-    #         print(f"Node server started on port {constants.CACHE1_PORT + i}")
-    #         num_spun += 1
-    #         i += 1
-    #     except Exception as e:
-    #         print(f"Node server failed to start on port {constants.CACHE1_PORT + i}, trying next port..., exception {e}")
-    #         i += 1
-    #     if num_spun > constants.NUM_CACHE_SERVERS:
-    #         break
-    # print("All node servers started")
-    # print(node_servers)
-
-    # for thread in node_servers:
-    #     thread.join()
