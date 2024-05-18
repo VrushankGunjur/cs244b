@@ -40,7 +40,6 @@ def receive_heartbeats():
         nodePort = int(response[0])
         nodeId = response[1]
 
-
         # assign an id if server doesn't yet have one
         print("received heartbeat from node server")
         if nodeId == '':
@@ -68,25 +67,23 @@ def receive_heartbeats():
             connection.sendall("".encode())
         connection.close()
 
-        # this flush only runs after the blocking call to 'accept', so it might not actually remove failed caches on time
-        # @viraj
-        flush()
-
 # Flush caches that haven't sent heartbeats recently (this cleanup isn't working right now, see above @viraj)
 def flush():
-    for node_id in list(node_servers.keys()):
-        if time.time() - node_servers[node_id] > constants.MAX_HEARTBEAT_TIME:
-            print("node removed")
-            print(f"Locking server_map_lockk")
-            server_map_lock.acquire()
-            del node_servers[node_id]
-            del node_id_to_port[node_id]
-            server_map_lock.release()
-            print(f"Released server_map_lock")
+    while True:
+        for node_id in list(node_servers.keys()):
+            if time.time() - node_servers[node_id] > constants.HEARTBEAT_EXPIRATION_TIME:
+                print("node removed")
+                print(f"Locking server_map_lockk")
+                server_map_lock.acquire()
+                del node_servers[node_id]
+                del node_id_to_port[node_id]
+                server_map_lock.release()
+                print(f"Released server_map_lock")
 
-            hash_ring_lock.acquire()
-            hash_ring.remove_node(node_id)
-            hash_ring_lock.release()
+                hash_ring_lock.acquire()
+                hash_ring.remove_node(node_id)
+                hash_ring_lock.release()
+        time.sleep(constants.HEARTBEAT_INTERVAL * 2)
 
 """
  TODO: hash the URL to determine which cache server to send request to, out of the running
@@ -148,6 +145,10 @@ def run_server():
     # start a thread to deal with all heartbeats in a loop (and this can handle managing cache servers)
     heartbeat_thread = threading.Thread(target = receive_heartbeats)
     heartbeat_thread.start()
+
+    # start a thread to flush nodes that haven't sent heartbeats
+    flush_thread = threading.Thread(target = flush)
+    flush_thread.start()
     
     # then, start HTTP server
     server_address = ('localhost', constants.MASTER_PORT)
@@ -156,6 +157,7 @@ def run_server():
     httpd.serve_forever()
 
     heartbeat_thread.join()
+    flush_thread.join()
 
 if __name__ == "__main__":
     run_server()
