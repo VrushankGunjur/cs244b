@@ -85,7 +85,7 @@ class NodeServer:
                     self.cache_lock.release()
                 response_to_master = status_code_bytes + response_body
                 print(f"Went to internet")
-            socket_to_master.send(response_to_master)
+            socket_to_master.sendall(response_to_master)
             # socket_to_master.close()
 
             # data = self.to_master.recv(PKT_SIZE)

@@ -126,7 +126,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         s.send(self.path.encode())
 
         # receive response from cache server
-        response = s.recv(constants.PKT_SIZE)
+        response = recv_all(s)
         response_string = response.decode('utf-8')
         try:
             status_code = int(response_string[:3])
@@ -142,6 +142,16 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(response_body)
         #self.wfile.writee.content)
+
+def recv_all(sock, buffer_size=4096):
+    data = b''
+    while True:
+        part = sock.recv(buffer_size)
+        data += part
+        if len(part) < buffer_size:
+            # If part is less than buffer_size, we assume it's the end of the data
+            break
+    return data
 
 def run_server():
     # start a thread to deal with all heartbeats in a loop (and this can handle managing cache servers)
