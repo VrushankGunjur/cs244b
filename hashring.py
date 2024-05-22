@@ -1,13 +1,12 @@
 from sortedcontainers import SortedDict
-import xxhash
+import mmh3 
 
-"""
-    Has
-"""
+
 class HashRing():
     def __init__(self):
         self.cur_nodes = SortedDict()
-        self.hash = lambda x : xxhash.xxh32(str(x).encode()).intdigest()
+        self.hash = lambda x : mmh3.hash(str(x))
+        #self.hash = lambda x : xxhash.xxh32(str(x).encode()).intdigest()
 
     def __getitem__(self, key):
         hash_value = self.hash(key)
