@@ -40,6 +40,7 @@ class NodeServer:
         while True:
             to_master = socket.socket()
             to_master.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            to_master.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             to_master.connect(('localhost', constants.TO_MASTER_FROM_NODES))
             msg = str(self.port) # the port # is the heartbeat message
             msg += ','
@@ -58,34 +59,38 @@ class NodeServer:
         # listen for commands from master server
         while True:
             socket_to_master, _ = self.from_master.accept()
-            data = socket_to_master.recv(constants.PKT_SIZE)
-            # process the command
-            print(f"Received command on node server {self.id}: ", data.decode())
-            
-            # check if in cache, if not, send request to web server. Respond to master server with response
-            url = data.decode()
-            self.cache_lock.acquire()
-            if url in self.cache:
-                self.cache.move_to_end(url, last=True)
-                response_to_master = bytes("200", 'utf-8') + self.cache[url]
-                self.cache_lock.release()
-                print(f"Hit cache")
-            else:
-                # MAKE REQUEST TO INTERNET
-                self.cache_lock.release()
-                response = requests.get(url)
-                response_body = response.content
-                status_code_bytes = bytes(str(response.status_code), 'utf-8')
-                if response.status_code == 200:
-                    self.cache_lock.acquire()
-                    self.cache[url] = response_body
-                    if len(self.cache) > constants.MAX_CACHE_SIZE:
-                        self.cache.popitem(last=False)  # Pop LRU item
+            try:
+                data = socket_to_master.recv(constants.PKT_SIZE)
+                # process the command
+                print(f"Received command on node server {self.id}: ", data.decode())
+                
+                # check if in cache, if not, send request to web server. Respond to master server with response
+                url = data.decode()
+                self.cache_lock.acquire()
+                if url in self.cache:
+                    self.cache.move_to_end(url, last=True)
+                    response_to_master = bytes("200", 'utf-8') + self.cache[url]
                     self.cache_lock.release()
-                response_to_master = status_code_bytes + response_body
-                print(f"Went to internet")
-            socket_to_master.sendall(response_to_master)
-            # socket_to_master.close()
+                    print(f"Hit cache")
+                else:
+                    # MAKE REQUEST TO INTERNET
+                    self.cache_lock.release()
+                    response = requests.get(url)
+                    response_body = response.content
+                    status_code_bytes = bytes(str(response.status_code), 'utf-8')
+                    if response.status_code == 200:
+                        self.cache_lock.acquire()
+                        self.cache[url] = response_body
+                        if len(self.cache) > constants.MAX_CACHE_SIZE:
+                            self.cache.popitem(last=False)  # Pop LRU item
+                        self.cache_lock.release()
+                    response_to_master = status_code_bytes + response_body
+                    print(f"Went to internet")
+                socket_to_master.sendall(response_to_master)
+            except Exception as e:
+                print(f"Error: {e}")
+            finally:
+                socket_to_master.close()
 
             # data = self.to_master.recv(PKT_SIZE)
             # print("Received data: ", data.decode())
