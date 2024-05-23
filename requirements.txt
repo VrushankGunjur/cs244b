@@ -5,3 +5,4 @@ httpx==0.26.0
 httpcore==1.0.2
 sortedcontainers==2.4.0
 mmh3==4.1.0
+kazoo==2.10.0

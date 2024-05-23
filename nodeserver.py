@@ -6,6 +6,11 @@ from collections import OrderedDict
 import time
 import sys
 
+"""
+    Control plane (send heartbeats)
+    Response plane (service inbound requests)
+"""
+
 class NodeServer:
     def __init__(self, host, port):
         # set up connection to master server

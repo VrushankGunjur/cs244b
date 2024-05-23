@@ -7,6 +7,11 @@ from collections import defaultdict
 from hashring import HashRing
 
 """
+    Node management plane
+    Client service plane
+"""
+
+"""
 Central Server listens for connections/client requests, checks if their request is in cache. 
 If not, server makes a request to the web server, caches the response, and sends the response to the client.
 Central Server also listens to communications from the cache shards to monitor status.
