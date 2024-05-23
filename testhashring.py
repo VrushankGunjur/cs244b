@@ -74,8 +74,6 @@ def stressTest(n=10000):
         print(f"For {url}, typical response {typicalLatencies[url]}")
         print(f'    vs. avg cache time {mean(responseTimes)}, with {len(errors[url])} total errors')
 
-
-
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         stressTest(int(sys.argv[1]))
