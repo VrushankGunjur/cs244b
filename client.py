@@ -1,11 +1,11 @@
 import requests 
 import time
 import sys
-
+from kazoo.client import KazooClient
 # Client code makes a request for a webpage, rerouting through server (proxy)
 
 proxies = {
-    "http": "http://localhost:5001",
+    "http": "http://localhost:5004",
     "https": "http://localhost:5001"
 }
 
@@ -16,6 +16,13 @@ def run_client():
     url = "http://www.google.com"
     if len(sys.argv) > 1:
         url = sys.argv[1]
+    
+    global zk
+    zk = KazooClient(hosts='127.0.0.1:2181')
+    zk.start()
+
+    newport = zk.get("/election").decode()[0].split(",")[2]
+    proxies["http"] = "http://localhost:" + newport
     r = requests.get(url, proxies=proxies)
     print(r.text)
 
