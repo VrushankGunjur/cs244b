@@ -5,6 +5,8 @@ import constants
 import time
 from collections import defaultdict
 from hashring import HashRing
+import os
+import json
 
 """
 Central Server listens for connections/client requests, checks if their request is in cache. 
@@ -18,6 +20,20 @@ next_node_server_id = 0             # id to assign to next cache server that sen
 server_map_lock = threading.Lock()  # lock for node_servers and node_id_to_port
 hash_ring = HashRing()              # hash ring to determine which cache server to send request to
 hash_ring_lock = threading.Lock()   # lock for hash_ring
+
+node_id_to_requests_path = 'load_distribution.json' # key: node_id, value: number of cache requests
+
+def read_json(filepath):
+    if os.path.exists(filepath):
+        with open(filepath, 'r') as file:
+            return json.load(file)
+    else:
+        return {}
+
+# Update the json entry at key of node_id with the new request
+def update_json(filepath, node_id_to_request):
+    with open(filepath, 'w') as file:
+        json.dump(node_id_to_request, file, indent = 0)
 
 def receive_heartbeats():
     global next_node_server_id
@@ -57,6 +73,7 @@ def receive_heartbeats():
             connection.sendall(str(next_node_server_id).encode())
             next_node_server_id += 1
             print("assigning node id...")
+            nodeID = next_node_server_id
         else:
             print(f"Locking server_map_lock")
             with server_map_lock:
@@ -65,7 +82,15 @@ def receive_heartbeats():
             connection.sendall("".encode())
         connection.close()
 
-# Flush caches that haven't sent heartbeats recently (this cleanup isn't working right now, see above @viraj)
+        # Update load distribution json for load balance testing
+        load_distribution = read_json(node_id_to_requests_path)
+        if nodeID in load_distribution:
+            load_distribution[nodeID] += 1
+        else:
+            load_distribution[nodeID] = 1
+        update_json(node_id_to_requests_path, load_distribution)
+
+# Flush caches that haven't sent heartbeats recently
 def flush():
     while True:
         for node_id in list(node_servers.keys()):
