@@ -78,16 +78,16 @@ def run_node_server():
 
     # get the leader's port (to listen to) and the port to send mail to
     # leader_name, host, port to listen to, port to send to
-    leader_name, to_leader_host, to_leader_port = zk.get('/election')[0].decode().split(",")
+    leader_name, to_leader_host, to_leader_port, client_request_port = zk.get('/election')[0].decode().split(",")
     node_server_list[0].startup(getNewSocketAndPort(), to_leader_host, to_leader_port)
     #node_server_list[0].startup(leader_host, leader_port_listen, leader_port_send)
 
 def leader_election():
     print(f"leader_election function")
     # at the start, we don't set port information. We only set that if we become the leader
-    my_name = zk.create('/election/contender', b',,', ephemeral=True, sequence=True)
+    my_name = zk.create('/election/contender', b',,,', ephemeral=True, sequence=True)
     print(my_name)
-    zk.set(my_name, f"{my_name.split('/')[-1]},,".encode())
+    zk.set(my_name, f"{my_name.split('/')[-1]},,,".encode())
     # my_name is this node's queue ID number (e.g. /election/contender0000000001)
     #print(zk.get(my_name)[0].decode())
     print(f'my_name is {my_name}')
@@ -104,29 +104,35 @@ def leader_election():
         children = zk.get_children("/election")
         if not children:
             return
+        print(f"LMAO children {children}")
         new_leader = min(children)
+        #print(f"new leader {new_leader}")
         new_leader_info = zk.get("/election/" + new_leader)[0].decode()
         print(f"LZJLKJALKDFJL; {zk.get('/election')[0].decode()}")
-        leader_name, _, _ = new_leader_info.split(",")
+        leader_name, to_leader_host, to_leader_port, _ = new_leader_info.split(",")
         
 
-        old_leader_name, _, _ = zk.get("/election")[0].decode().split(",")
+        old_leader_name, _, _, _ = zk.get("/election")[0].decode().split(",")
         
         print(f"LMAO old_leader_name {old_leader_name} new leader name {leader_name}")
 
-        if old_leader_name == leader_name:
+        if old_leader_name == leader_name:  # leader did not change
             return
-        elif leader_name != my_name.split("/")[-1]:
+        elif leader_name != my_name.split("/")[-1]:  # leader changed, but not me
+            print("the leader changed, but not me")
+            while not to_leader_port:
+                time.sleep(0.5)
+                _, to_leader_host, to_leader_port, _ = zk.get("/election")[0].decode().split(",")
+            node_server_list[0].reset(to_leader_host, to_leader_port)  
             return
         
         # we are the new leader
         to_me_socket, to_me_port = become_leader()
         # TODO: change from localhost
-        zk.set('/election', f"{my_name},localhost,{to_me_port}".encode())
         print(f"{leader_name} became new leader")
 
         # run on a different thread?
-        run_master_server(to_me_socket, to_me_port)
+        run_master_server(to_me_socket, to_me_port, my_name.split("/")[-1])
 
     # TODO: don't busy wait (as much? sleep?)
     while 1:
@@ -142,8 +148,9 @@ def main():
     zk.start()
 
     if not zk.exists("/election"):
-        zk.create('/election', b',,')
+        zk.create('/election', b',,,')
         print(f"created /election with value {zk.get('/election')}")
+
     # Create an election object
     #election = Election(zk, "/election_path", identifier=sys.argv[1])
 
@@ -310,7 +317,7 @@ def recv_all(sock, buffer_size=4096):
             break
     return data
 
-def run_master_server(to_me_socket, to_me_port):
+def run_master_server(to_me_socket, to_me_port, my_name):
     # start a thread to deal with all heartbeats in a loop (and this can handle managing cache servers)
     #to_master_socket_and_port = getNewSocketAndPort()
     heartbeat_thread = threading.Thread(target = receive_heartbeats, args=(to_me_socket, to_me_port))
@@ -336,6 +343,7 @@ def run_master_server(to_me_socket, to_me_port):
             server_address = ('localhost', cur_port)
             httpd = HTTPServer(server_address, RequestHandler)
             print(f'Starting master server on port {cur_port}')
+            zk.set('/election', f"{my_name},localhost,{to_me_port},{cur_port}".encode())
             # httpd = HTTPServer(server_address, RequestHandler)
             # print('Starting master server on port 5001')
             httpd.serve_forever()

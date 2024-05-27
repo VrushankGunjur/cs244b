@@ -32,8 +32,8 @@ class NodeServer:
         self.to_master_host = new_to_master_host
         self.to_master_port = new_to_master_port
         self.exit = False
-
-
+        self.id = ''
+        
     def heartbeat(self):
         # send heartbeats to master server
         while not self.exit:
