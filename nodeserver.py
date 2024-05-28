@@ -28,7 +28,7 @@ class NodeServer:
             self.from_master.close()
     
     def reset(self, new_to_master_host, new_to_master_port):
-
+        # change who we're sending messages to
         self.to_master_host = new_to_master_host
         self.to_master_port = new_to_master_port
         self.exit = False

@@ -1,6 +1,5 @@
 import threading
 from kazoo.client import KazooClient
-from kazoo.recipe.election import Election
 import time
 import socket
 from nodeserver import NodeServer
@@ -9,9 +8,6 @@ import threading
 import constants
 from collections import defaultdict
 from hashring import HashRing
-import sys
-from psutil import process_iter
-from signal import SIGTERM # or SIGKILL
 
 AM_LEADER = False
 cur_leader_port = None
@@ -43,7 +39,7 @@ def become_leader():
     node_server_id = node_server_list[0].id
     hash_ring.remove_node(node_server_id)
 
-    node_server_list[0].exit = True # should exit the loop
+    node_server_list[0].exit = True         # should exit the loop
     node_server_list[0].from_master.close() # close the server
 
     # pick the ports to listen to and send to and advertise on the election node
@@ -61,6 +57,12 @@ def run_node_server():
     # get the leader's port (to listen to) and the port to send mail to
     # leader_name, host, port to listen to, port to send to
     _, to_leader_host, to_leader_port, _ = zk.get('/election')[0].decode().split(",")
+
+    # if to_leader_host or to_leader_port are empty string, wait until they're reset
+    while to_leader_host == '' or to_leader_port == '':
+        time.sleep(0.5)
+        _, to_leader_host, to_leader_port, _ = zk.get('/election')[0].decode().split(",")
+
     node_server_list[0].startup(getNewSocketAndPort(), to_leader_host, to_leader_port)
 
 def leader_election():
