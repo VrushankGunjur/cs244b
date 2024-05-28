@@ -36,4 +36,5 @@ class HashRing():
 
     def remove_node(self, nodeID):
         hash_value = self.hash(nodeID)
-        del self.cur_nodes[hash_value]
+        if hash_value in self.cur_nodes:
+            del self.cur_nodes[hash_value]

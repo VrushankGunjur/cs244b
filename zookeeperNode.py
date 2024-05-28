@@ -45,6 +45,9 @@ def become_leader():
         print(node_server_list)
         time.sleep(0.05) # sleep for 1 second
 
+    node_server_id = node_server_list[0].id
+    hash_ring.remove_node(node_server_id)
+
     node_server_list[0].exit = True # should exit the loop
     print(f"LMAO SET EXIT ")
     node_server_list[0].from_master.close() # close the server
