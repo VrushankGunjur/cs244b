@@ -82,14 +82,6 @@ def receive_heartbeats():
             connection.sendall("".encode())
         connection.close()
 
-        # Update load distribution json for load balance testing
-        load_distribution = read_json(node_id_to_requests_path)
-        if nodeID in load_distribution:
-            load_distribution[nodeID] += 1
-        else:
-            load_distribution[nodeID] = 1
-        update_json(node_id_to_requests_path, load_distribution)
-
 # Flush caches that haven't sent heartbeats recently
 def flush():
     while True:
@@ -144,6 +136,14 @@ class RequestHandler(BaseHTTPRequestHandler):
             s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             s.connect(('localhost', node_port))
             s.send(self.path.encode())
+
+            # Update load distribution json for load balance testing
+            load_distribution = read_json(node_id_to_requests_path)
+            if node_id in load_distribution:
+                load_distribution[node_id] += 1
+            else:
+                load_distribution[node_id] = 1
+            update_json(node_id_to_requests_path, load_distribution)
 
             # receive response from cache server
             response = recv_all(s)
