@@ -1,0 +1,12 @@
+{
+"http://www.google.com/": 1,
+"http://en.wikipedia.org/wiki/Main_Page": 2,
+"http://www.youtube.com/": 1,
+"http://www.reddit.com/": 0,
+"http://www.tsinghua.edu.cn/en/": 1,
+"http://www.nytimes.com/": 1,
+"http://www.cnn.com/": 0,
+"http://www.foxnews.com/": 1,
+"http://www.stanford.edu/": 2,
+"http://stackoverflow.com/": 2
+}

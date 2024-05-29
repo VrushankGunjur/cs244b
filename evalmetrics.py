@@ -23,11 +23,12 @@ websites = [
 
 def load_balance_test(num_iters):
     for _ in range(num_iters):
-        for website in websites:
+        for url in websites:
             try:
-                r = requests.get(url, proxies=proxies)
+                r = requests.get(url, proxies = proxies)
+                print('request made')
             except Exception as e:
-                print('error')
+                print(e)
         
 if __name__ == "__main__":
     if len(sys.argv) > 1:

@@ -21,7 +21,11 @@ server_map_lock = threading.Lock()  # lock for node_servers and node_id_to_port
 hash_ring = HashRing()              # hash ring to determine which cache server to send request to
 hash_ring_lock = threading.Lock()   # lock for hash_ring
 
-node_id_to_requests_path = 'load_distribution.json' # key: node_id, value: number of cache requests
+load_distribution_json = 'load_distribution.json' 
+website_to_node_json = 'website_to_node.json'
+load_distribution = defaultdict(int) # key: node_id, value: number of cache requests
+website_to_node = defaultdict(int)  # key: website, value: node_id 
+load_distribution[-1] = 0
 
 def read_json(filepath):
     if os.path.exists(filepath):
@@ -137,13 +141,17 @@ class RequestHandler(BaseHTTPRequestHandler):
             s.connect(('localhost', node_port))
             s.send(self.path.encode())
 
-            # Update load distribution json for load balance testing
-            load_distribution = read_json(node_id_to_requests_path)
+            # Update load distribution dict for load balance testing
+            load_distribution[-1] += 1
             if node_id in load_distribution:
                 load_distribution[node_id] += 1
             else:
                 load_distribution[node_id] = 1
-            update_json(node_id_to_requests_path, load_distribution)
+            website_to_node[requested_url] = node_id
+
+            if load_distribution[-1] == 1000:
+                update_json(load_distribution_json, load_distribution)
+                update_json(website_to_node_json, website_to_node)
 
             # receive response from cache server
             response = recv_all(s)
