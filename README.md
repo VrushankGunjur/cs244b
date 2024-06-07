@@ -66,7 +66,8 @@ In the zookeeper branch, the additional `zookeeperNode.py` file contains the bul
 We use Python3 for the majority of the code, alongside a few small shell scripts.
 
 - [Apache Zookeeper](https://zookeeper.apache.org/) for leader elections
-- [Kazoo](https://kazoo.readthedocs.io/en/latest/) to wrap Zookeeper
+- [Kazoo](https://kazoo.readthedocs.io/en/latest/) to wrap Zookeeper in Python
 - [MurmurHash3](https://en.wikipedia.org/wiki/MurmurHash) for an extremely fast and sufficiently fault-tolerant hash function
+- [Python Requests Module](https://pypi.org/project/requests/) to simulate internet traffic by making HTTP requests
 
 We code most of the functionality, including all of the functionality for conducting consistent hashing, from scratch in Python.
