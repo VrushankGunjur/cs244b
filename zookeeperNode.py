@@ -87,7 +87,7 @@ def leader_election():
         if not children:
             return
         
-        new_leader = min(children)
+        new_leader = min(children)  # this new leader could be the old leader
         new_leader_info = zk.get("/election/" + new_leader)[0].decode()
 
         print(f"leader information: {zk.get('/election')[0].decode()}")

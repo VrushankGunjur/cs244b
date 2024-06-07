@@ -6,6 +6,6 @@ for ((i=0; i<$num_nodes; i++))
 do 
     port=$((start_port+i))
     echo "Starting node $i on port $port"
-    python3 nodeserver.py $port &
+    python3 zookeeperNode.py $port &
     sleep 1
 done
