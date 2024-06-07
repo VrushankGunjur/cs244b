@@ -2,7 +2,7 @@
 
 We present a Python implementation of a web cache that makes use of consistent hashing for dynamic load balancing. 
 
-There are two branches, `main` and `zookeeper`. The `main` branch contains code for our baseline implementation of web caching that makes use of consistent hashing to allow for dynamic availability of cache servers without impacting performance. However, the implementation on the main branch relies on a strong master. If this master dies, the system shuts down.
+There are **two branches**, `main` and `zookeeper`. The `main` branch contains code for our baseline implementation of web caching that makes use of consistent hashing to allow for dynamic availability of cache servers without impacting performance. However, the implementation on the main branch relies on a strong master. If this master dies, the system shuts down.
 
 To address this issue, we implement leader elections in the `zookeeper` branch. We make use of a Python library called `Kazoo` to interface with Apache Zookeeper. Since the Election recipe in Kazoo doesn't do what we need it to (namely, publish network information to redirect all members of the cluster), we implement our own mechanism for elections described in the paper.
 
