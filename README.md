@@ -50,7 +50,7 @@ to ensure a clean shutdown
 
 `constants.py` contains relevant constants shared across files 
 
-`evalmetrics.py`, `load_distribution.json`, `testhashring.py`, and `website_to_node.json` are used internally for testing
+`internal/` [`evalmetrics.py`, `load_distribution.json`, `testhashring.py`, and `website_to_node.json`] are used internally for testing
 
 `init_nodes.sh` is a helper script to spin up node servers, `shutdown_nodes.sh` is the corresponding cleanup script
 
@@ -59,3 +59,14 @@ to ensure a clean shutdown
 `nodeserver.py` contains the code for cache nodes in the baseline implementation
 
 In the zookeeper branch, the additional `zookeeperNode.py` file contains the bulk of the code for a multipurpose cluster node that participates in elections, and toggles between master and follower as required.
+
+
+## Tech Stack
+
+We use Python3 for the majority of the code, with a few small shell scripts.
+
+- [Apache Zookeeper](https://zookeeper.apache.org/) for leader elections
+- [Kazoo](https://kazoo.readthedocs.io/en/latest/) to wrap Zookeeper
+- [MurmurHash3](https://en.wikipedia.org/wiki/MurmurHash) for an extremely fast and sufficiently fault-tolerant hash function
+
+We code most of the functionality, including all of the functionality for conducting consistent hashing, from scratch in Python.
