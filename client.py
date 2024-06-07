@@ -21,7 +21,11 @@ def run_client():
     zk = KazooClient(hosts='127.0.0.1:2181')
     zk.start()
 
-    newport = zk.get("/election")[0].decode().split(",")[3]
+	# client gets current master
+	newport = ''
+	while newport == '':
+	    newport = zk.get("/election")[0].decode().split(",")[3]
+	
     proxies["http"] = "http://localhost:" + newport
     r = requests.get(url, proxies=proxies)
     print(r.text)
