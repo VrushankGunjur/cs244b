@@ -5,6 +5,8 @@ import constants
 import time
 from collections import defaultdict
 from hashring import HashRing
+import os
+import json
 
 """
     Node management plane
@@ -24,6 +26,24 @@ server_map_lock = threading.Lock()  # lock for node_servers and node_id_to_port
 hash_ring = HashRing()              # hash ring to determine which cache server to send request to
 hash_ring_lock = threading.Lock()   # lock for hash_ring
 
+load_distribution_json = 'load_distribution.json' 
+website_to_node_json = 'website_to_node.json'
+load_distribution = defaultdict(int) # key: node_id, value: number of cache requests
+website_to_node = defaultdict(int)  # key: website, value: node_id 
+load_distribution[-1] = 0
+
+def read_json(filepath):
+    if os.path.exists(filepath):
+        with open(filepath, 'r') as file:
+            return json.load(file)
+    else:
+        return {}
+
+# Update the json entry at key of node_id with the new request
+def update_json(filepath, node_id_to_request):
+    with open(filepath, 'w') as file:
+        json.dump(node_id_to_request, file, indent = 0)
+
 def receive_heartbeats():
     global next_node_server_id
     # set up a socket on 5003, listen for heartbeats from cache servers
@@ -32,6 +52,7 @@ def receive_heartbeats():
     # host = socket.gethostname()
 
     from_node = socket.socket()
+    from_node.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     from_node.bind(('localhost', constants.TO_MASTER_FROM_NODES))
     print(f"Master listening to node servers on port {constants.TO_MASTER_FROM_NODES}...")
     from_node.listen(constants.NUM_CACHE_SERVERS) # how many clients the server can listen to at the same time
@@ -50,44 +71,40 @@ def receive_heartbeats():
         if nodeId == '':
             incoming_port = nodePort
             print(f"Locking server_map_lock")
-            server_map_lock.acquire()
-            node_id_to_port[next_node_server_id] = incoming_port
-            node_servers[next_node_server_id] = time.time()
-            server_map_lock.release()
+            with server_map_lock:
+                node_id_to_port[next_node_server_id] = incoming_port
+                node_servers[next_node_server_id] = time.time()
             print(f"Released server_map_lock")
             print(f"Locking hash_ring_lock")
-            hash_ring_lock.acquire()
-            hash_ring.add_node(next_node_server_id)
-            hash_ring_lock.release()
+            with hash_ring_lock:
+                hash_ring.add_node(next_node_server_id)
             print(f"Released hash_ring_lock")
             connection.sendall(str(next_node_server_id).encode())
             next_node_server_id += 1
             print("assigning node id...")
+            nodeID = next_node_server_id
         else:
             print(f"Locking server_map_lock")
-            server_map_lock.acquire()
-            node_servers[int(nodeId)] = time.time()
-            server_map_lock.release()
+            with server_map_lock:
+                node_servers[int(nodeId)] = time.time()
             print(f"Released server_map_lock")
             connection.sendall("".encode())
         connection.close()
 
-# Flush caches that haven't sent heartbeats recently (this cleanup isn't working right now, see above @viraj)
+# Flush caches that haven't sent heartbeats recently
 def flush():
     while True:
         for node_id in list(node_servers.keys()):
             if time.time() - node_servers[node_id] > constants.HEARTBEAT_EXPIRATION_TIME:
                 print("node removed")
                 print(f"Locking server_map_lockk")
-                server_map_lock.acquire()
-                del node_servers[node_id]
-                del node_id_to_port[node_id]
-                server_map_lock.release()
+                with server_map_lock:
+                    del node_servers[node_id]
+                    del node_id_to_port[node_id]
                 print(f"Released server_map_lock")
 
-                hash_ring_lock.acquire()
-                hash_ring.remove_node(node_id)
-                hash_ring_lock.release()
+                with hash_ring_lock:
+                    hash_ring.remove_node(node_id)
         time.sleep(constants.HEARTBEAT_INTERVAL * 2)
 
 """
@@ -114,37 +131,64 @@ class RequestHandler(BaseHTTPRequestHandler):
         # forward request to cache server
         requested_url = self.path
         print(f"Locking hash_ring_lock")
-        hash_ring_lock.acquire()
-        node_id = hash_ring[requested_url]
-        hash_ring_lock.release()
+        with hash_ring_lock:
+            node_id = hash_ring[requested_url]
         print(f"Release hash_ring_lock")
 
         print(f"Locking server_map_lockk")
-        server_map_lock.acquire()
-        node_port = node_id_to_port[node_id]
-        server_map_lock.release()
+        with server_map_lock:
+            node_port = node_id_to_port[node_id]
         print(f"Release server_map_lockk")
 
-        s = socket.socket()
-        s.connect(('localhost', node_port))
-        s.send(self.path.encode())
-
-        # receive response from cache server
-        response = s.recv(constants.PKT_SIZE)
-        response_string = response.decode('utf-8')
         try:
-            status_code = int(response_string[:3])
-            response_body = bytes(response_string[3:], 'utf-8')
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            s.connect(('localhost', node_port))
+            s.send(self.path.encode())
+
+            # Update load distribution dict for load balance testing
+            load_distribution[-1] += 1
+            if node_id in load_distribution:
+                load_distribution[node_id] += 1
+            else:
+                load_distribution[node_id] = 1
+            website_to_node[requested_url] = node_id
+
+            if load_distribution[-1] == 1000:
+                update_json(load_distribution_json, load_distribution)
+                update_json(website_to_node_json, website_to_node)
+
+            # receive response from cache server
+            response = recv_all(s)
+            response_string = response.decode('utf-8')
+            try:
+                status_code = int(response_string[:3])
+                response_body = bytes(response_string[3:], 'utf-8')
+            except Exception as e:
+                status_code = -1
+                response_body = b''      
+                print(f"error {e} in response from cache server")  
+            
+            # forward cache server response to client
+            self.send_response(status_code)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            self.wfile.write(response_body)
         except Exception as e:
-            status_code = -1
-            response_body = b''      
-            print(f"error {e} in response from cache server")  
-        
-        # forward cache server response to client
-        self.send_response(status_code)
-        self.send_header('Cstatus_codeent-type', 'text/html')
-        self.end_headers()
-        self.wfile.write(response_body)
+            print(f"Error in master server: {e}")
+            self.send_error(500)
+        finally:
+            s.close()
+
+def recv_all(sock, buffer_size=4096):
+    data = b''
+    while True:
+        part = sock.recv(buffer_size)
+        data += part
+        if len(part) < buffer_size:
+            # If part is less than buffer_size, we assume it's the end of the data
+            break
+    return data
 
 def run_server():
     # start a thread to deal with all heartbeats in a loop (and this can handle managing cache servers)
