@@ -63,7 +63,7 @@ In the zookeeper branch, the additional `zookeeperNode.py` file contains the bul
 
 ## Tech Stack
 
-We use Python3 for the majority of the code, with a few small shell scripts.
+We use Python3 for the majority of the code, alongside a few small shell scripts.
 
 - [Apache Zookeeper](https://zookeeper.apache.org/) for leader elections
 - [Kazoo](https://kazoo.readthedocs.io/en/latest/) to wrap Zookeeper
